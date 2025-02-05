@@ -1,40 +1,65 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
-#include "hardware/uart.h"
+#include "hardware/timer.h"
 
-// UART defines
-// By default the stdout UART is `uart0`, so we will use the second one
-#define UART_ID uart1
-#define BAUD_RATE 115200
+#define LED_VERMELHO 11
+#define LED_AMARELO 12
+#define LED_VERDE 13
 
-// Use pins 4 and 5 for UART1
-// Pins can be changed, see the GPIO function select table in the datasheet for information on GPIO assignments
-#define UART_TX_PIN 4
-#define UART_RX_PIN 5
+static volatile int estado = 0; // 0 = Vermelho, 1 = Amarelo, 2 = Verde
 
+bool temporizador_callback(struct repeating_timer *t) {
+    // Desliga todos os LEDs antes de mudar o estado
+    gpio_put(LED_VERMELHO, 0);
+    gpio_put(LED_AMARELO, 0);
+    gpio_put(LED_VERDE, 0);
 
+    // Alterna o estado do semáforo
+    switch (estado) {
+        case 0:
+            gpio_put(LED_AMARELO, 1);
+            estado = 1;
+            break;
+        case 1:
+            gpio_put(LED_VERDE, 1);
+            estado = 2;
+            break;
+        case 2:
+            gpio_put(LED_VERMELHO, 1);
+            estado = 0;
+            break;
+    }
+    return true;
+}
 
-int main()
-{
+int main() {
     stdio_init_all();
 
-    // Set up our UART
-    uart_init(UART_ID, BAUD_RATE);
-    // Set the TX and RX pins by using the function select on the GPIO
-    // Set datasheet for more information on function select
-    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-    
-    // Use some the various UART functions to send out data
-    // In a default system, printf will also output via the default UART
-    
-    // Send out a string, with CR/LF conversions
-    uart_puts(UART_ID, " Hello, UART!\n");
-    
-    // For more examples of UART use see https://github.com/raspberrypi/pico-examples/tree/master/uart
+    gpio_init(LED_VERMELHO);
+    gpio_set_dir(LED_VERMELHO, GPIO_OUT);
+    gpio_init(LED_AMARELO);
+    gpio_set_dir(LED_AMARELO, GPIO_OUT);
+    gpio_init(LED_VERDE);
+    gpio_set_dir(LED_VERDE, GPIO_OUT);
+
+    gpio_put(LED_VERMELHO, 1); // Inicia no vermelho
+
+    struct repeating_timer timer;
+    add_repeating_timer_ms(3000, temporizador_callback, NULL, &timer);
 
     while (true) {
-        printf("Hello, world!\n");
+        switch (estado) {
+            case 0:
+                printf("Semáforo: Vermelho\n");
+                break;
+            case 1:
+                printf("Semáforo: Amarelo\n");
+                break;
+            case 2:
+                printf("Semáforo: Verde\n");
+                break;
+        }
         sleep_ms(1000);
     }
+    return 0;
 }
